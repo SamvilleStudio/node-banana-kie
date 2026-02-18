@@ -215,3 +215,15 @@ volumes:
 
 - Where to store Cloudflare Tunnel config (local vs Docker)?
 - Do we need multi-user access controls?
+
+## Implementation Tasks
+
+- [x] Add Dockerized PostgreSQL with restart policy (`docker-compose.yml`).
+- [x] Add Prisma schema/client setup (`prisma/schema.prisma`, `src/lib/prisma.ts`, package scripts/deps).
+- [x] Add DB-backed project/workflow/run/image metadata routes.
+- [x] Update `/api/workflow` and `/api/save-generation` to support database mode.
+- [x] Persist run history to DB via `/api/logs` integration.
+- [x] Remove required server-side folder picker dependency from project setup flow.
+- [x] Update store to support `projectId` + DB persistence pathing (`/uploads/<projectId>/...`).
+- [x] Add/import migration tooling for legacy filesystem projects (`scripts/import-legacy-workflows.js`, `docs/legacy-import.md`, `npm run db:import-legacy`).
+- [x] Finalize Cloudflare Tunnel runtime setup docs (local install vs Docker sidecar) (`docs/cloudflare-tunnel.md`, optional `cloudflared` compose profile + npm scripts).

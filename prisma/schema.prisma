@@ -1,0 +1,78 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Project {
+  id          String         @id @default(cuid())
+  name        String
+  description String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  workflows   Workflow[]
+  runs        RunHistory[]
+  assets      GeneratedAsset[]
+}
+
+model Workflow {
+  id        String         @id
+  projectId String
+  project   Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name      String
+  data      Json
+  version   Int            @default(1)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  runs      RunHistory[]
+  assets    GeneratedAsset[]
+
+  @@index([projectId])
+}
+
+model RunHistory {
+  id         String    @id @default(cuid())
+  sessionId  String    @unique
+  projectId  String?
+  workflowId String?
+  project    Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  workflow   Workflow? @relation(fields: [workflowId], references: [id], onDelete: SetNull)
+  startedAt  DateTime
+  endedAt    DateTime?
+  status     String
+  nodeCount  Int?
+  cost       Float?
+  error      String?
+  logs       Json?
+  createdAt  DateTime  @default(now())
+
+  @@index([projectId, createdAt])
+  @@index([workflowId, createdAt])
+}
+
+model GeneratedAsset {
+  id         String    @id @default(cuid())
+  storageId  String    @unique
+  projectId  String?
+  workflowId String?
+  runId      String?
+  project    Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  workflow   Workflow? @relation(fields: [workflowId], references: [id], onDelete: SetNull)
+  type       String
+  mimeType   String
+  fileName   String
+  filePath   String
+  fileHash   String
+  nodeId     String?
+  prompt     String?
+  modelId    String?
+  cost       Float?
+  createdAt  DateTime  @default(now())
+
+  @@index([projectId, createdAt])
+  @@index([workflowId, createdAt])
+  @@index([runId])
+}

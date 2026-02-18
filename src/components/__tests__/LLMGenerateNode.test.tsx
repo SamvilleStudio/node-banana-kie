@@ -148,7 +148,7 @@ describe("LLMGenerateNode", () => {
 
       expect(mockUpdateNodeData).toHaveBeenCalledWith("test-llm-1", {
         provider: "openai",
-        model: "gpt-4.1-mini",
+        model: "gpt-5.2",
       });
     });
   });
@@ -231,14 +231,14 @@ describe("LLMGenerateNode", () => {
   });
 
   describe("Idle State", () => {
-    it("should show 'Run to generate' message when idle and no output", () => {
+    it("should show Run button when idle and no output", () => {
       render(
         <TestWrapper>
           <LLMGenerateNode {...createNodeProps({ status: "idle", outputText: null })} />
         </TestWrapper>
       );
 
-      expect(screen.getByText("Run to generate")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Run" })).toBeInTheDocument();
     });
   });
 

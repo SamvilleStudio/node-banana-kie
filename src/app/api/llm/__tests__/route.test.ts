@@ -99,14 +99,16 @@ describe("/api/llm route", () => {
       expect(response.status).toBe(200);
       expect(data.success).toBe(true);
       expect(data.text).toBe("Generated response from Gemini");
-      expect(mockGenerateContent).toHaveBeenCalledWith({
+
+      const googleCall = mockGenerateContent.mock.calls[0]?.[0];
+      expect(googleCall).toMatchObject({
         model: "gemini-2.5-flash",
-        contents: "Test prompt",
         config: {
           temperature: 0.7,
           maxOutputTokens: 1024,
         },
       });
+      expect(googleCall.contents).toEqual(expect.stringContaining("Test prompt"));
     });
 
     it("should handle multimodal input (images + prompt)", async () => {
@@ -132,22 +134,25 @@ describe("/api/llm route", () => {
       expect(data.success).toBe(true);
       expect(data.text).toBe("Description of the image");
 
-      // Verify multimodal content structure
-      expect(mockGenerateContent).toHaveBeenCalledWith({
+      const googleCall = mockGenerateContent.mock.calls[0]?.[0];
+      expect(googleCall).toMatchObject({
         model: "gemini-2.5-flash",
-        contents: [
-          {
-            inlineData: {
-              mimeType: "image/png",
-              data: "iVBORw0KGgo=",
-            },
-          },
-          { text: "Describe this image" },
-        ],
         config: {
           temperature: 0.7,
           maxOutputTokens: 1024,
         },
+      });
+
+      // Verify multimodal content structure
+      expect(Array.isArray(googleCall.contents)).toBe(true);
+      expect(googleCall.contents[0]).toEqual({
+        inlineData: {
+          mimeType: "image/png",
+          data: "iVBORw0KGgo=",
+        },
+      });
+      expect(googleCall.contents[1]).toEqual({
+        text: expect.stringContaining("Describe this image"),
       });
     });
 
@@ -293,22 +298,25 @@ describe("/api/llm route", () => {
       expect(response.status).toBe(200);
       expect(data.success).toBe(true);
 
-      // Verify fallback to PNG mime type
-      expect(mockGenerateContent).toHaveBeenCalledWith({
+      const googleCall = mockGenerateContent.mock.calls[0]?.[0];
+      expect(googleCall).toMatchObject({
         model: "gemini-2.5-flash",
-        contents: [
-          {
-            inlineData: {
-              mimeType: "image/png",
-              data: "iVBORw0KGgoAAAANSUhEUgAAAAUA",
-            },
-          },
-          { text: "Describe this" },
-        ],
         config: {
           temperature: 0.7,
           maxOutputTokens: 1024,
         },
+      });
+
+      // Verify fallback to PNG mime type
+      expect(Array.isArray(googleCall.contents)).toBe(true);
+      expect(googleCall.contents[0]).toEqual({
+        inlineData: {
+          mimeType: "image/png",
+          data: "iVBORw0KGgoAAAANSUhEUgAAAAUA",
+        },
+      });
+      expect(googleCall.contents[1]).toEqual({
+        text: expect.stringContaining("Describe this"),
       });
     });
   });
@@ -344,23 +352,24 @@ describe("/api/llm route", () => {
       expect(data.success).toBe(true);
       expect(data.text).toBe("OpenAI response text");
 
-      // Verify fetch was called with correct parameters
-      expect(mockFetch).toHaveBeenCalledWith(
-        "https://api.openai.com/v1/chat/completions",
-        expect.objectContaining({
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: "Bearer test-openai-key",
-          },
-          body: JSON.stringify({
-            model: "gpt-4.1-mini",
-            messages: [{ role: "user", content: "Test prompt" }],
-            temperature: 0.7,
-            max_tokens: 1024,
-          }),
-        })
-      );
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      const [url, requestInit] = mockFetch.mock.calls[0];
+      expect(url).toBe("https://api.openai.com/v1/chat/completions");
+      expect(requestInit).toMatchObject({
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer test-openai-key",
+        },
+      });
+      const requestBody = JSON.parse(requestInit.body as string);
+      expect(requestBody).toMatchObject({
+        model: "gpt-4.1-mini",
+        temperature: 0.7,
+        max_tokens: 1024,
+      });
+      expect(requestBody.messages[0]).toMatchObject({ role: "system" });
+      expect(requestBody.messages[1]).toEqual({ role: "user", content: "Test prompt" });
     });
 
     it("should handle vision input (images + prompt)", async () => {
@@ -390,27 +399,24 @@ describe("/api/llm route", () => {
       expect(data.success).toBe(true);
       expect(data.text).toBe("Image description from OpenAI");
 
-      // Verify fetch was called with vision content structure
-      expect(mockFetch).toHaveBeenCalledWith(
-        "https://api.openai.com/v1/chat/completions",
-        expect.objectContaining({
-          method: "POST",
-          body: JSON.stringify({
-            model: "gpt-4.1-mini",
-            messages: [
-              {
-                role: "user",
-                content: [
-                  { type: "text", text: "Describe this image" },
-                  { type: "image_url", image_url: { url: "data:image/png;base64,iVBORw0KGgo=" } },
-                ],
-              },
-            ],
-            temperature: 0.7,
-            max_tokens: 1024,
-          }),
-        })
-      );
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      const [url, requestInit] = mockFetch.mock.calls[0];
+      expect(url).toBe("https://api.openai.com/v1/chat/completions");
+      expect(requestInit).toMatchObject({ method: "POST" });
+      const requestBody = JSON.parse(requestInit.body as string);
+      expect(requestBody).toMatchObject({
+        model: "gpt-4.1-mini",
+        temperature: 0.7,
+        max_tokens: 1024,
+      });
+      expect(requestBody.messages[0]).toMatchObject({ role: "system" });
+      expect(requestBody.messages[1]).toEqual({
+        role: "user",
+        content: [
+          { type: "text", text: "Describe this image" },
+          { type: "image_url", image_url: { url: "data:image/png;base64,iVBORw0KGgo=" } },
+        ],
+      });
     });
 
     it("should reject unknown provider", async () => {

@@ -68,7 +68,7 @@ describe("Header", () => {
   describe("Basic Rendering", () => {
     it("should render the app title", () => {
       render(<Header />);
-      expect(screen.getByText("Node Banana")).toBeInTheDocument();
+      expect(screen.getByText("AmBanana")).toBeInTheDocument();
     });
 
     it("should render the banana icon", () => {
@@ -315,7 +315,7 @@ describe("Header", () => {
       });
 
       render(<Header />);
-      const saveButton = screen.getByTitle("Configure save location");
+      const saveButton = screen.getByTitle("Configure project");
       fireEvent.click(saveButton);
 
       const modal = screen.getByTestId("project-setup-modal");
