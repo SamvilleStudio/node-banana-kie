@@ -19,8 +19,9 @@ export type WorkflowEdge = Edge<WorkflowEdgeData>;
 // Auto-save configuration stored in localStorage
 export interface WorkflowSaveConfig {
   workflowId: string;
+  projectId?: string | null;
   name: string;
-  directoryPath: string;
+  directoryPath: string | null;
   generationsPath: string | null;
   lastSavedAt: number | null;
   useExternalImageStorage?: boolean;  // Whether to store images as files vs embedded base64

@@ -81,7 +81,7 @@ const getProviderIcon = (provider: ProviderType) => {
 interface ProjectSetupModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (id: string, name: string, directoryPath: string) => void;
+  onSave: (id: string, name: string, directoryPath: string, projectId?: string) => void;
   mode: "new" | "settings";
 }
 
@@ -92,6 +92,7 @@ export function ProjectSetupModal({
   mode,
 }: ProjectSetupModalProps) {
   const {
+    projectId,
     workflowName,
     saveDirectoryPath,
     useExternalImageStorage,
@@ -111,7 +112,6 @@ export function ProjectSetupModal({
   const [directoryPath, setDirectoryPath] = useState("");
   const [externalStorage, setExternalStorage] = useState(true);
   const [isValidating, setIsValidating] = useState(false);
-  const [isBrowsing, setIsBrowsing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Provider tab state
@@ -189,7 +189,7 @@ export function ProjectSetupModal({
         .then((data) => setOpenaiAuthStatus(data))
         .catch(() => setOpenaiAuthStatus(null));
     }
-  }, [isOpen, mode, workflowName, saveDirectoryPath, useExternalImageStorage, providerSettings]);
+  }, [isOpen, mode, workflowName, saveDirectoryPath, useExternalImageStorage, providerSettings, projectId]);
 
   const handleConnectOpenAI = async () => {
     setIsOpenAIOAuthBusy(true);
@@ -225,32 +225,40 @@ export function ProjectSetupModal({
     }
   };
 
-  const handleBrowse = async () => {
-    setIsBrowsing(true);
-    setError(null);
+  const createOrUpdateProject = async (projectName: string): Promise<string> => {
+    const isUpdate = mode === "settings" && !!projectId;
+    const endpoint = isUpdate ? `/api/projects/${projectId}` : "/api/projects";
 
-    try {
-      const response = await fetch("/api/browse-directory");
-      const result = await response.json();
+    const response = await fetch(endpoint, {
+      method: isUpdate ? "PATCH" : "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: projectName }),
+    });
 
-      if (!result.success) {
-        setError(result.error || "Failed to open directory picker");
-        return;
-      }
+    const result = await response.json();
+    if (!response.ok || !result.success || !result.project?.id) {
+      throw new Error(result.error || "Failed to save project in database");
+    }
 
-      if (result.cancelled) {
-        return;
-      }
+    return result.project.id as string;
+  };
 
-      if (result.path) {
-        setDirectoryPath(result.path);
-      }
-    } catch (err) {
-      setError(
-        `Failed to open directory picker: ${err instanceof Error ? err.message : "Unknown error"}`
-      );
-    } finally {
-      setIsBrowsing(false);
+  const validateDirectoryPath = async (trimmedPath: string): Promise<void> => {
+    if (!(trimmedPath.startsWith("/") || /^[A-Za-z]:[\\\/]/.test(trimmedPath) || trimmedPath.startsWith("\\\\"))) {
+      throw new Error("Project directory must be an absolute path (starting with /, a drive letter, or a UNC path)");
+    }
+
+    const response = await fetch(
+      `/api/workflow?path=${encodeURIComponent(trimmedPath)}`
+    );
+    const result = await response.json();
+
+    if (!result.exists) {
+      throw new Error("Project directory does not exist");
+    }
+
+    if (!result.isDirectory) {
+      throw new Error("Project path is not a directory");
     }
   };
 
@@ -260,48 +268,29 @@ export function ProjectSetupModal({
       return;
     }
 
-    if (!directoryPath.trim()) {
-      setError("Project directory is required");
-      return;
-    }
-
-    const trimmedPath = directoryPath.trim();
-    if (!(trimmedPath.startsWith("/") || /^[A-Za-z]:[\\\/]/.test(trimmedPath) || trimmedPath.startsWith("\\\\"))) {
-      setError("Project directory must be an absolute path (starting with /, a drive letter, or a UNC path)");
-      return;
-    }
-
     setIsValidating(true);
     setError(null);
 
     try {
-      // Validate project directory exists
-      const response = await fetch(
-        `/api/workflow?path=${encodeURIComponent(directoryPath.trim())}`
-      );
-      const result = await response.json();
+      const trimmedName = name.trim();
+      const trimmedPath = directoryPath.trim();
+      let nextProjectId: string | undefined;
 
-      if (!result.exists) {
-        setError("Project directory does not exist");
-        setIsValidating(false);
-        return;
-      }
-
-      if (!result.isDirectory) {
-        setError("Project path is not a directory");
-        setIsValidating(false);
-        return;
+      if (trimmedPath) {
+        await validateDirectoryPath(trimmedPath);
+      } else {
+        nextProjectId = await createOrUpdateProject(trimmedName);
       }
 
       const id = mode === "new" ? generateWorkflowId() : useWorkflowStore.getState().workflowId || generateWorkflowId();
       // Update external storage setting
       setUseExternalImageStorage(externalStorage);
-      onSave(id, name.trim(), directoryPath.trim());
-      setIsValidating(false);
+      onSave(id, trimmedName, trimmedPath, nextProjectId);
     } catch (err) {
       setError(
-        `Failed to validate directory: ${err instanceof Error ? err.message : "Unknown error"}`
+        err instanceof Error ? err.message : "Failed to configure project"
       );
+    } finally {
       setIsValidating(false);
     }
   };
@@ -344,7 +333,7 @@ export function ProjectSetupModal({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !isValidating && !isBrowsing) {
+    if (e.key === "Enter" && !isValidating) {
       handleSave();
     }
     if (e.key === "Escape") {
@@ -420,27 +409,17 @@ export function ProjectSetupModal({
 
             <div>
               <label className="block text-sm text-neutral-400 mb-1">
-                Project Directory
+                Project Directory (Optional)
               </label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={directoryPath}
-                  onChange={(e) => setDirectoryPath(e.target.value)}
-                  placeholder="/Users/username/projects/my-project"
-                  className="flex-1 px-3 py-2 bg-neutral-900 border border-neutral-600 rounded text-neutral-100 text-sm focus:outline-none focus:border-neutral-500"
-                />
-                <button
-                  type="button"
-                  onClick={handleBrowse}
-                  disabled={isBrowsing}
-                  className="px-3 py-2 bg-neutral-700 hover:bg-neutral-600 disabled:bg-neutral-700 disabled:opacity-50 text-neutral-200 text-sm rounded transition-colors"
-                >
-                  {isBrowsing ? "..." : "Browse"}
-                </button>
-              </div>
+              <input
+                type="text"
+                value={directoryPath}
+                onChange={(e) => setDirectoryPath(e.target.value)}
+                placeholder="Leave empty to use database-backed storage"
+                className="w-full px-3 py-2 bg-neutral-900 border border-neutral-600 rounded text-neutral-100 text-sm focus:outline-none focus:border-neutral-500"
+              />
               <p className="text-xs text-neutral-500 mt-1">
-                Workflow files and images will be saved here. Subfolders for inputs and generations will be auto-created.
+                Leave empty to store project/workflow metadata in PostgreSQL. Set a local absolute path only for legacy filesystem saves.
               </p>
             </div>
 
@@ -1047,7 +1026,7 @@ export function ProjectSetupModal({
           </button>
           <button
             onClick={handleSave}
-            disabled={activeTab === "project" && (isValidating || isBrowsing)}
+            disabled={activeTab === "project" && isValidating}
             className="px-4 py-2 text-sm bg-white text-neutral-900 rounded hover:bg-neutral-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {activeTab === "project"

@@ -529,6 +529,29 @@ function getKieSchema(modelId: string): ExtractedSchema {
         { name: "image_urls", type: "image", required: true, label: "Image", isArray: true },
       ],
     },
+    "seedream/5-lite-image-to-image": {
+      parameters: [
+        { name: "aspect_ratio", type: "string", description: "Output aspect ratio", enum: ["1:1", "4:3", "3:4", "16:9", "9:16", "2:3", "3:2", "21:9"], default: "1:1" },
+        { name: "quality", type: "string", description: "Output quality", enum: ["basic", "high"], default: "basic" },
+        { name: "seed", type: "integer", description: "Random seed for reproducibility", minimum: 0 },
+      ],
+      inputs: [
+        { name: "prompt", type: "text", required: true, label: "Prompt" },
+        { name: "image_urls", type: "image", required: true, label: "Image", isArray: true },
+      ],
+    },
+    "nano-banana-2": {
+      parameters: [
+        { name: "aspect_ratio", type: "string", description: "Output aspect ratio", enum: ["1:1", "2:3", "3:2", "4:3", "16:9", "9:16", "21:9", "auto"], default: "auto" },
+        { name: "resolution", type: "string", description: "Output resolution", enum: ["1K", "2K", "4K"], default: "2K" },
+        { name: "output_format", type: "string", description: "Output format", enum: ["jpg", "png"], default: "jpg" },
+        { name: "google_search", type: "boolean", description: "Enable Google Search grounding", default: false },
+      ],
+      inputs: [
+        { name: "prompt", type: "text", required: true, label: "Prompt" },
+        { name: "image_input", type: "image", required: false, label: "Image", isArray: true },
+      ],
+    },
     "gpt-image/1.5-text-to-image": {
       parameters: [
         { name: "aspect_ratio", type: "string", description: "Output aspect ratio", enum: ["1:1", "2:3", "3:2"], default: "3:2" },

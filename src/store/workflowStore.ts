@@ -45,6 +45,7 @@ import { useToast } from "@/components/Toast";
 import { calculateGenerationCost } from "@/utils/costCalculator";
 import { logger } from "@/utils/logger";
 import { externalizeWorkflowImages, hydrateWorkflowImages } from "@/utils/imageStorage";
+import { getProjectGenerationsPublicPath, getProjectOutputsPublicPath } from "@/lib/storagePaths";
 import { EditOperation, applyEditOperations as executeEditOps } from "@/lib/chat/editOperations";
 import {
   loadSaveConfigs,
@@ -158,6 +159,7 @@ interface WorkflowStore {
   clearGlobalHistory: () => void;
 
   // Auto-save state
+  projectId: string | null;
   workflowId: string | null;
   workflowName: string | null;
   saveDirectoryPath: string | null;
@@ -170,7 +172,13 @@ interface WorkflowStore {
   imageRefBasePath: string | null;  // Directory from which current imageRefs are valid
 
   // Auto-save actions
-  setWorkflowMetadata: (id: string, name: string, path: string, generationsPath?: string | null) => void;
+  setWorkflowMetadata: (
+    id: string,
+    name: string,
+    path: string,
+    generationsPath?: string | null,
+    projectId?: string | null
+  ) => void;
   setWorkflowName: (name: string) => void;
   setGenerationsPath: (path: string | null) => void;
   setAutoSaveEnabled: (enabled: boolean) => void;
@@ -250,7 +258,7 @@ const pendingImageSyncs = new Map<string, Promise<void>>();
 // Helper to save a generation and sync the history ID
 // Returns immediately but tracks the async operation for later awaiting
 function trackSaveGeneration(
-  genPath: string,
+  genPath: string | null,
   content: { image?: string; video?: string },
   prompt: string | null,
   tempId: string,
@@ -259,16 +267,29 @@ function trackSaveGeneration(
   get: () => WorkflowStore,
   updateNodeData: (nodeId: string, data: Partial<WorkflowNodeData>) => void
 ): void {
+  const { projectId, workflowId } = get();
+  if (!genPath && !projectId) {
+    return;
+  }
+
+  const payload: Record<string, unknown> = {
+    image: content.image,
+    video: content.video,
+    prompt,
+    imageId: tempId,
+    projectId: projectId ?? undefined,
+    workflowId: workflowId ?? undefined,
+    nodeId,
+  };
+
+  if (genPath) {
+    payload.directoryPath = genPath;
+  }
+
   const syncPromise = fetch("/api/save-generation", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      directoryPath: genPath,
-      image: content.image,
-      video: content.video,
-      prompt,
-      imageId: tempId,
-    }),
+    body: JSON.stringify(payload),
   })
     .then((res) => res.json())
     .then((saveResult) => {
@@ -466,6 +487,7 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
   globalImageHistory: [],
 
   // Auto-save initial state
+  projectId: null,
   workflowId: null,
   workflowName: null,
   saveDirectoryPath: null,
@@ -2427,11 +2449,13 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
                 contentType: "video"
               });
 
-              // Save to /outputs directory if we have a project path
-              const { saveDirectoryPath } = get();
-              if (saveDirectoryPath) {
+              // Save to /outputs directory if project persistence is configured
+              const { saveDirectoryPath, projectId, workflowId } = get();
+              if (saveDirectoryPath || projectId) {
                 const outputNodeData = node.data as OutputNodeData;
-                const outputsPath = `${saveDirectoryPath}/outputs`;
+                const outputsPath = saveDirectoryPath
+                  ? `${saveDirectoryPath}/outputs`
+                  : getProjectOutputsPublicPath(projectId as string);
 
                 // Fire and forget - don't block workflow execution
                 fetch("/api/save-generation", {
@@ -2439,6 +2463,9 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({
                     directoryPath: outputsPath,
+                    projectId: projectId || undefined,
+                    workflowId: workflowId || undefined,
+                    nodeId: node.id,
                     video: videoContent,
                     customFilename: outputNodeData.outputFilename || undefined,
                     createDirectory: true, // Create /outputs if it doesn't exist
@@ -2470,11 +2497,13 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
                 });
               }
 
-              // Save to /outputs directory if we have a project path
-              const { saveDirectoryPath } = get();
-              if (saveDirectoryPath) {
+              // Save to /outputs directory if project persistence is configured
+              const { saveDirectoryPath, projectId, workflowId } = get();
+              if (saveDirectoryPath || projectId) {
                 const outputNodeData = node.data as OutputNodeData;
-                const outputsPath = `${saveDirectoryPath}/outputs`;
+                const outputsPath = saveDirectoryPath
+                  ? `${saveDirectoryPath}/outputs`
+                  : getProjectOutputsPublicPath(projectId as string);
 
                 // Fire and forget - don't block workflow execution
                 fetch("/api/save-generation", {
@@ -2482,6 +2511,9 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({
                     directoryPath: outputsPath,
+                    projectId: projectId || undefined,
+                    workflowId: workflowId || undefined,
+                    nodeId: node.id,
                     image: isVideoContent ? undefined : content,
                     video: isVideoContent ? content : undefined,
                     customFilename: outputNodeData.outputFilename || undefined,
@@ -2800,7 +2832,14 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
         fetch('/api/logs', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ session }),
+          body: JSON.stringify({
+            session,
+            projectId: get().projectId,
+            workflowId: get().workflowId,
+            nodeCount: get().nodes.length,
+            cost: get().incurredCost,
+            status: 'success',
+          }),
         }).catch((err) => {
           console.error('Failed to save log session:', err);
         });
@@ -2828,7 +2867,15 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
         fetch('/api/logs', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ session }),
+          body: JSON.stringify({
+            session,
+            projectId: get().projectId,
+            workflowId: get().workflowId,
+            nodeCount: get().nodes.length,
+            cost: get().incurredCost,
+            status: 'error',
+            error: error instanceof Error ? error.message : 'Workflow execution failed',
+          }),
         }).catch((err) => {
           console.error('Failed to save log session:', err);
         });
@@ -3896,7 +3943,14 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
         fetch('/api/logs', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ session }),
+          body: JSON.stringify({
+            session,
+            projectId: get().projectId,
+            workflowId: get().workflowId,
+            nodeCount: 1,
+            cost: get().incurredCost,
+            status: 'success',
+          }),
         }).catch((err) => {
           console.error('Failed to save log session:', err);
         });
@@ -3920,7 +3974,15 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
         fetch('/api/logs', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ session }),
+          body: JSON.stringify({
+            session,
+            projectId: get().projectId,
+            workflowId: get().workflowId,
+            nodeCount: 1,
+            cost: get().incurredCost,
+            status: 'error',
+            error: error instanceof Error ? error.message : 'Node regeneration failed',
+          }),
         }).catch((err) => {
           console.error('Failed to save log session:', err);
         });
@@ -4002,9 +4064,13 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
     // Look up saved config from localStorage (only if workflow has an ID)
     const configs = loadSaveConfigs();
     const savedConfig = workflow.id ? configs[workflow.id] : null;
+    const savedProjectId = savedConfig?.projectId || null;
 
     // Determine the workflow directory path (passed in or from saved config)
-    const directoryPath = workflowPath || savedConfig?.directoryPath;
+    const directoryPath = workflowPath || savedConfig?.directoryPath || null;
+    const generationsPath =
+      savedConfig?.generationsPath ||
+      (savedProjectId ? getProjectGenerationsPublicPath(savedProjectId) : null);
 
     // Hydrate images if we have a directory path and the workflow has image refs
     let hydratedWorkflow = workflow;
@@ -4037,16 +4103,17 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
       isRunning: false,
       currentNodeIds: [],
       // Restore workflow ID and paths from localStorage if available
+      projectId: savedProjectId,
       workflowId: workflow.id || null,
       workflowName: workflow.name,
-      saveDirectoryPath: directoryPath || null,
-      generationsPath: savedConfig?.generationsPath || null,
+      saveDirectoryPath: directoryPath,
+      generationsPath,
       lastSavedAt: savedConfig?.lastSavedAt || null,
       hasUnsavedChanges: false,
       // Restore cost data
       incurredCost: costData?.incurredCost || 0,
       // Track where imageRefs are valid from
-      imageRefBasePath: directoryPath || null,
+      imageRefBasePath: directoryPath,
       // Restore image storage setting (default to true for backwards compatibility)
       useExternalImageStorage: savedConfig?.useExternalImageStorage ?? true,
       // Reset viewed comments when loading new workflow
@@ -4067,6 +4134,7 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
       isRunning: false,
       currentNodeIds: [],
       // Reset auto-save state when clearing workflow
+      projectId: null,
       workflowId: null,
       workflowName: null,
       saveDirectoryPath: null,
@@ -4099,15 +4167,30 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
   },
 
   // Auto-save actions
-  setWorkflowMetadata: (id: string, name: string, path: string, generationsPath?: string | null) => {
+  setWorkflowMetadata: (
+    id: string,
+    name: string,
+    path: string,
+    generationsPath?: string | null,
+    projectId?: string | null
+  ) => {
     // Auto-derive generationsPath: use provided value, fall back to existing, then auto-derive
     const currentGenPath = get().generationsPath;
-    const derivedGenerationsPath = generationsPath ?? currentGenPath ?? `${path}/generations`;
+    const normalizedPath = path.trim();
+    const normalizedProjectId = projectId ? projectId.trim() : null;
+    const projectGenerationsPath = normalizedProjectId
+      ? getProjectGenerationsPublicPath(normalizedProjectId)
+      : null;
+    const derivedGenerationsPath =
+      generationsPath ??
+      currentGenPath ??
+      (normalizedPath ? `${normalizedPath}/generations` : projectGenerationsPath);
 
     set({
+      projectId: normalizedProjectId,
       workflowId: id,
       workflowName: name,
-      saveDirectoryPath: path,
+      saveDirectoryPath: normalizedPath || null,
       generationsPath: derivedGenerationsPath,
     });
   },
@@ -4143,6 +4226,7 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
       edges,
       edgeStyle,
       groups,
+      projectId,
       workflowId,
       workflowName,
       saveDirectoryPath,
@@ -4150,7 +4234,7 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
       imageRefBasePath,
     } = get();
 
-    if (!workflowId || !workflowName || !saveDirectoryPath) {
+    if (!workflowId || !workflowName || (!saveDirectoryPath && !projectId)) {
       return false;
     }
 
@@ -4172,9 +4256,11 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
         return data.imageRef || data.outputImageRef || data.sourceImageRef || data.inputImageRefs;
       });
 
+      const canExternalize = useExternalImageStorage && !!saveDirectoryPath;
+
       // If saving to a different directory than where refs point, clear refs
       // so images will be re-saved to the new location
-      const isNewDirectory = useExternalImageStorage && (
+      const isNewDirectory = canExternalize && (
         // Case 1: Known different directory
         (imageRefBasePath !== null && imageRefBasePath !== saveDirectoryPath) ||
         // Case 2: Has refs but unknown where they came from - treat as new directory to be safe
@@ -4206,7 +4292,7 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
       };
 
       // If external image storage is enabled, externalize images before saving
-      if (useExternalImageStorage) {
+      if (canExternalize && saveDirectoryPath) {
         workflow = await externalizeWorkflowImages(workflow, saveDirectoryPath);
       }
 
@@ -4214,7 +4300,8 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          directoryPath: saveDirectoryPath,
+          directoryPath: saveDirectoryPath || undefined,
+          projectId: projectId || undefined,
           filename: workflowName,
           workflow,
         }),
@@ -4224,10 +4311,27 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
 
       if (result.success) {
         const timestamp = Date.now();
+        const resolvedProjectId =
+          typeof result.projectId === "string" && result.projectId.trim().length > 0
+            ? result.projectId
+            : projectId;
+        const resolvedWorkflowId =
+          typeof result.workflowId === "string" && result.workflowId.trim().length > 0
+            ? result.workflowId
+            : workflowId;
+        const resolvedGenerationsPath =
+          typeof result.generationsPath === "string" && result.generationsPath.trim().length > 0
+            ? result.generationsPath
+            : get().generationsPath ||
+              (resolvedProjectId
+                ? getProjectGenerationsPublicPath(resolvedProjectId)
+                : saveDirectoryPath
+                ? `${saveDirectoryPath}/generations`
+                : null);
 
         // If we externalized images, update store nodes with the refs
         // This prevents duplicate images on subsequent saves
-        if (useExternalImageStorage && workflow.nodes !== currentNodes) {
+        if (canExternalize && workflow.nodes !== currentNodes) {
           // Merge refs from externalized nodes into current nodes (keeping image data)
           const nodesWithRefs = currentNodes.map((node, index) => {
             const externalizedNode = workflow.nodes[index];
@@ -4259,6 +4363,9 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
 
           set({
             nodes: nodesWithRefs,
+            projectId: resolvedProjectId || null,
+            workflowId: resolvedWorkflowId,
+            generationsPath: resolvedGenerationsPath,
             lastSavedAt: timestamp,
             hasUnsavedChanges: false,
             // Update imageRefBasePath to reflect new save location
@@ -4266,19 +4373,23 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
           });
         } else {
           set({
+            projectId: resolvedProjectId || null,
+            workflowId: resolvedWorkflowId,
+            generationsPath: resolvedGenerationsPath,
             lastSavedAt: timestamp,
             hasUnsavedChanges: false,
             // Update imageRefBasePath to reflect save location
-            imageRefBasePath: useExternalImageStorage ? saveDirectoryPath : null,
+            imageRefBasePath: canExternalize ? saveDirectoryPath : null,
           });
         }
 
         // Update localStorage
         saveSaveConfig({
-          workflowId,
+          workflowId: resolvedWorkflowId,
+          projectId: resolvedProjectId || null,
           name: workflowName,
-          directoryPath: saveDirectoryPath,
-          generationsPath: get().generationsPath,
+          directoryPath: saveDirectoryPath || null,
+          generationsPath: resolvedGenerationsPath,
           lastSavedAt: timestamp,
           useExternalImageStorage,
         });
@@ -4311,7 +4422,7 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
         state.hasUnsavedChanges &&
         state.workflowId &&
         state.workflowName &&
-        state.saveDirectoryPath &&
+        (state.saveDirectoryPath || state.projectId) &&
         !state.isSaving
       ) {
         await state.saveToFile();

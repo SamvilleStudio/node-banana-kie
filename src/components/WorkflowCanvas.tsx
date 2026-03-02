@@ -1073,6 +1073,7 @@ export function WorkflowCanvas() {
             promptConstructor: { width: 340, height: 280 },
             klingPrompt: { width: 360, height: 420 },
             nanoBanana: { width: 300, height: 300 },
+            nanoBananaEdit: { width: 300, height: 420 },
             generateVideo: { width: 300, height: 300 },
             soraStoryboard: { width: 400, height: 480 },
             veoReferenceVideo: { width: 320, height: 300 },
@@ -1557,8 +1558,8 @@ export function WorkflowCanvas() {
         <ProjectSetupModal
           isOpen={showNewProjectSetup}
           mode="new"
-          onSave={(id, name, directoryPath) => {
-            setWorkflowMetadata(id, name, directoryPath);
+          onSave={(id, name, directoryPath, projectId) => {
+            setWorkflowMetadata(id, name, directoryPath, undefined, projectId || null);
             setShowNewProjectSetup(false);
           }}
           onClose={() => {

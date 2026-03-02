@@ -19,6 +19,7 @@ const VALID_NODE_TYPES: NodeType[] = [
   "promptConstructor",
   "klingPrompt",
   "nanoBanana",
+  "nanoBananaEdit",
   "generateVideo",
   "soraStoryboard",
   "veoReferenceVideo",
@@ -45,6 +46,7 @@ const DEFAULT_DIMENSIONS: Record<NodeType, { width: number; height: number }> = 
   promptConstructor: { width: 340, height: 280 },
   klingPrompt: { width: 360, height: 420 },
   nanoBanana: { width: 300, height: 300 },
+  nanoBananaEdit: { width: 320, height: 320 },
   generateVideo: { width: 300, height: 300 },
   soraStoryboard: { width: 400, height: 480 },
   veoReferenceVideo: { width: 320, height: 300 },
@@ -319,6 +321,18 @@ function createDefaultNodeData(type: NodeType): WorkflowNodeData {
         imageHistory: [],
         selectedHistoryIndex: 0,
       };
+    case "nanoBananaEdit":
+      return {
+        inputImages: [],
+        inputPrompt: null,
+        outputImage: null,
+        aspectRatio: "1:1",
+        outputFormat: "png",
+        status: "idle",
+        error: null,
+        imageHistory: [],
+        selectedHistoryIndex: 0,
+      };
     case "generateVideo":
       return {
         inputImages: [],
@@ -395,6 +409,8 @@ function createDefaultNodeData(type: NodeType): WorkflowNodeData {
         progress: 0,
         encoderSupported: null,
       };
+    default:
+      throw new Error(`Unsupported node type: ${type}`);
   }
 }
 

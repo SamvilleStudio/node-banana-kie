@@ -226,13 +226,10 @@ describe("ConnectionDropMenu", () => {
     it("should wrap around when navigating past last item", () => {
       render(<ConnectionDropMenu {...defaultProps} handleType="text" connectionType="source" />);
 
-      // Text target options: Prompt, Prompt Constructor, nanoBanana, generateVideo, llmGenerate (5 items)
-      // Navigate down 5 times to wrap to first
-      fireEvent.keyDown(document, { key: "ArrowDown" });
-      fireEvent.keyDown(document, { key: "ArrowDown" });
-      fireEvent.keyDown(document, { key: "ArrowDown" });
-      fireEvent.keyDown(document, { key: "ArrowDown" });
-      fireEvent.keyDown(document, { key: "ArrowDown" });
+      const menuButtons = screen.getAllByRole("button");
+      for (let i = 0; i < menuButtons.length; i++) {
+        fireEvent.keyDown(document, { key: "ArrowDown" });
+      }
 
       // Should be back on first item (Prompt)
       const firstButton = screen.getByText("Prompt").closest("button");

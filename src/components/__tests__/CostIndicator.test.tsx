@@ -106,7 +106,7 @@ describe("CostIndicator", () => {
 
       render(<CostIndicator />);
 
-      expect(screen.getByText("$0.00")).toBeInTheDocument();
+      expect(screen.getByTitle("View cost details")).toHaveTextContent("$0.00");
     });
   });
 
@@ -131,7 +131,7 @@ describe("CostIndicator", () => {
       render(<CostIndicator />);
 
       // nano-banana costs $0.039/image
-      expect(screen.getByText("$0.04")).toBeInTheDocument();
+      expect(screen.getByTitle("View cost details")).toHaveTextContent("$0.04");
     });
 
     it("should format cost correctly for nano-banana-pro model", () => {
@@ -154,7 +154,7 @@ describe("CostIndicator", () => {
       render(<CostIndicator />);
 
       // nano-banana-pro 1K costs $0.134/image
-      expect(screen.getByText("$0.13")).toBeInTheDocument();
+      expect(screen.getByTitle("View cost details")).toHaveTextContent("$0.13");
     });
 
     it("should format cost correctly for 4K resolution", () => {
@@ -177,7 +177,7 @@ describe("CostIndicator", () => {
       render(<CostIndicator />);
 
       // nano-banana-pro 4K costs $0.24/image
-      expect(screen.getByText("$0.24")).toBeInTheDocument();
+      expect(screen.getByTitle("View cost details")).toHaveTextContent("$0.24");
     });
 
     it("should sum costs for multiple generation nodes", () => {
@@ -209,7 +209,7 @@ describe("CostIndicator", () => {
       render(<CostIndicator />);
 
       // 2 * $0.039 = $0.078
-      expect(screen.getByText("$0.08")).toBeInTheDocument();
+      expect(screen.getByTitle("View cost details")).toHaveTextContent("$0.08");
     });
   });
 
@@ -338,7 +338,7 @@ describe("CostIndicator", () => {
       const { rerender } = render(<CostIndicator />);
 
       // Initial cost: $0.039 = $0.04
-      expect(screen.getByText("$0.04")).toBeInTheDocument();
+      expect(screen.getByTitle("View cost details")).toHaveTextContent("$0.04");
 
       // Update to more nodes
       const updatedNodes: WorkflowNode[] = [
@@ -361,7 +361,7 @@ describe("CostIndicator", () => {
       rerender(<CostIndicator />);
 
       // Updated cost: $0.039 + $0.24 = $0.279 = $0.28
-      expect(screen.getByText("$0.28")).toBeInTheDocument();
+      expect(screen.getByTitle("View cost details")).toHaveTextContent("$0.28");
     });
 
     it("should update when incurredCost changes", () => {
@@ -372,7 +372,7 @@ describe("CostIndicator", () => {
       const { rerender } = render(<CostIndicator />);
 
       // $0.00 predicted (no generation nodes), but should show due to incurredCost
-      expect(screen.getByText("$0.00")).toBeInTheDocument();
+      expect(screen.getByTitle("View cost details")).toHaveTextContent("$0.00");
 
       // Update incurredCost
       mockUseWorkflowStore.mockImplementation((selector) => {
@@ -382,7 +382,7 @@ describe("CostIndicator", () => {
       rerender(<CostIndicator />);
 
       // Still shows predicted cost $0.00 in the button
-      expect(screen.getByText("$0.00")).toBeInTheDocument();
+      expect(screen.getByTitle("View cost details")).toHaveTextContent("$0.00");
     });
   });
 
@@ -411,7 +411,7 @@ describe("CostIndicator", () => {
       render(<CostIndicator />);
 
       // 4 * $0.039 = $0.156 = $0.16
-      expect(screen.getByText("$0.16")).toBeInTheDocument();
+      expect(screen.getByTitle("View cost details")).toHaveTextContent("$0.16");
     });
 
     it("should not include unconfigured splitGrid costs", () => {

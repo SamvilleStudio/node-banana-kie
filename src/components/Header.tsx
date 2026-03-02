@@ -58,6 +58,7 @@ function CommentsNavigationIcon() {
 
 export function Header() {
   const {
+    projectId,
     workflowName,
     workflowId,
     saveDirectoryPath,
@@ -76,7 +77,7 @@ export function Header() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isProjectConfigured = !!workflowName;
-  const canSave = !!(workflowId && workflowName && saveDirectoryPath);
+  const canSave = !!(workflowId && workflowName && (saveDirectoryPath || projectId));
 
   const formatTime = (timestamp: number) => {
     return new Date(timestamp).toLocaleTimeString([], {
@@ -122,8 +123,13 @@ export function Header() {
     e.target.value = "";
   };
 
-  const handleProjectSave = async (id: string, name: string, path: string) => {
-    setWorkflowMetadata(id, name, path); // generationsPath is auto-derived
+  const handleProjectSave = async (
+    id: string,
+    name: string,
+    path: string,
+    nextProjectId?: string
+  ) => {
+    setWorkflowMetadata(id, name, path, undefined, nextProjectId || null);
     setShowProjectModal(false);
     // Small delay to let state update
     setTimeout(() => {
@@ -203,7 +209,7 @@ export function Header() {
                     onClick={() => canSave ? saveToFile() : handleOpenSettings()}
                     disabled={isSaving}
                     className="relative p-1.5 text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800 rounded transition-colors disabled:opacity-50"
-                    title={isSaving ? "Saving..." : canSave ? "Save project" : "Configure save location"}
+                    title={isSaving ? "Saving..." : canSave ? "Save project" : "Configure project"}
                   >
                     <svg
                       className="w-4 h-4"

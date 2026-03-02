@@ -201,7 +201,7 @@ describe("CostDialog", () => {
         />
       );
 
-      expect(screen.getByText("$0.46")).toBeInTheDocument();
+      expect(screen.getAllByText("$0.46").length).toBeGreaterThanOrEqual(2);
     });
 
     it("should render per-model cost rows with counts", () => {
@@ -614,7 +614,7 @@ describe("CostDialog", () => {
       );
 
       expect(screen.getByText(/Gemini pricing: \$0\.039-\$0\.24\/image/)).toBeInTheDocument();
-      expect(screen.getByText(/External providers not tracked/)).toBeInTheDocument();
+      expect(screen.getByText(/Other providers not tracked/)).toBeInTheDocument();
     });
   });
 });

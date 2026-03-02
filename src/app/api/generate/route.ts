@@ -1278,9 +1278,19 @@ function getKieModelDefaults(modelId: string): Record<string, unknown> {
     // Seedream models
     case "seedream/4.5-text-to-image":
     case "seedream/4.5-edit":
+    case "seedream/5-lite-image-to-image":
       return {
         aspect_ratio: "1:1",
         quality: "basic",
+      };
+
+    // Nano Banana 2 (Kie)
+    case "nano-banana-2":
+      return {
+        aspect_ratio: "auto",
+        resolution: "2K",
+        output_format: "jpg",
+        google_search: false,
       };
 
     // Nano Banana Pro (Kie)
@@ -1402,8 +1412,10 @@ function getKieModelDefaults(modelId: string): Record<string, unknown> {
  */
 function getKieImageInputKey(modelId: string): string {
   // Model-specific parameter names
+  if (modelId === "nano-banana-2") return "image_input";
   if (modelId === "nano-banana-pro") return "image_input";
   if (modelId === "seedream/4.5-edit") return "image_urls";
+  if (modelId === "seedream/5-lite-image-to-image") return "image_urls";
   if (modelId === "gpt-image/1.5-image-to-image") return "input_urls";
   if (modelId === "grok-imagine/image-to-image") return "image_url";
   if (modelId === "grok-imagine/image-to-video") return "image_url";

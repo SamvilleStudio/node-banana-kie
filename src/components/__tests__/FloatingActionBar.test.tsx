@@ -196,7 +196,7 @@ describe("FloatingActionBar", () => {
       expect(mockAddNode).toHaveBeenCalledWith("annotation", expect.any(Object));
     });
 
-    it("should call addNode when Prompt button is clicked", async () => {
+    it("should call addNode when Prompt Node option is clicked", async () => {
       render(
         <TestWrapper>
           <FloatingActionBar />
@@ -209,6 +209,7 @@ describe("FloatingActionBar", () => {
 
       const promptButton = screen.getByText("Prompt");
       fireEvent.click(promptButton);
+      fireEvent.click(screen.getByText("Prompt Node"));
 
       expect(mockAddNode).toHaveBeenCalledWith("prompt", expect.any(Object));
     });
@@ -270,13 +271,15 @@ describe("FloatingActionBar", () => {
       });
 
       const promptButton = screen.getByText("Prompt");
+      fireEvent.click(promptButton);
+      const promptNodeButton = screen.getByText("Prompt Node");
 
       const mockDataTransfer = {
         setData: vi.fn(),
         effectAllowed: "",
       };
 
-      fireEvent.dragStart(promptButton, {
+      fireEvent.dragStart(promptNodeButton, {
         dataTransfer: mockDataTransfer,
       });
 

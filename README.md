@@ -36,6 +36,7 @@ Configure API keys in Project Settings to enable these providers.
 - **State Management**: Zustand
 - **Styling**: Tailwind CSS
 - **AI**: Google Gemini API, OpenAI API, Replicate (Beta), fal.ai (Beta)
+- **Data**: PostgreSQL + Prisma
 
 ## Getting Started
 
@@ -53,6 +54,7 @@ GEMINI_API_KEY=your_gemini_api_key
 OPENAI_API_KEY=your_openai_api_key      # Optional, for OpenAI LLM provider
 REPLICATE_API_KEY=your_replicate_api_key  # Optional, beta
 FAL_API_KEY=your_fal_api_key              # Optional, beta
+DATABASE_URL=postgresql://banana:banana_secret@localhost:5432/nodebanana?schema=public
 ```
 
 ### Installation
@@ -64,10 +66,31 @@ npm install
 ### Development
 
 ```bash
+npm run db:up
+npm run db:push
 npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+`docker-compose.yml` uses `restart: unless-stopped` for PostgreSQL so it auto-recovers after host reboot when Docker starts.
+
+## Cloudflare Tunnel (HTTPS)
+
+Two supported runtime modes are documented in `docs/cloudflare-tunnel.md`:
+
+- Local `cloudflared` install.
+- Docker sidecar profile (`npm run tunnel:up`).
+
+## Legacy Filesystem Import
+
+For one-time migration of old filesystem projects into PostgreSQL:
+
+```bash
+npm run db:import-legacy -- --source /absolute/path/to/legacy/projects
+```
+
+Detailed import behavior and flags are documented in `docs/legacy-import.md`.
 
 ### Build
 

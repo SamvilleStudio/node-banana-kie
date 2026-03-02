@@ -176,7 +176,7 @@ describe("SplitGridSettingsModal", () => {
       expect(textarea).toHaveValue("New prompt text");
     });
 
-    it("should display helper text about individual editing", () => {
+    it("should not render legacy helper text about individual editing", () => {
       render(
         <SplitGridSettingsModal
           nodeId="test-node"
@@ -185,7 +185,7 @@ describe("SplitGridSettingsModal", () => {
         />
       );
 
-      expect(screen.getByText(/Each prompt node can be edited individually/)).toBeInTheDocument();
+      expect(screen.queryByText(/Each prompt node can be edited individually/)).not.toBeInTheDocument();
     });
   });
 
@@ -200,7 +200,8 @@ describe("SplitGridSettingsModal", () => {
       );
 
       expect(screen.getByText("Model")).toBeInTheDocument();
-      expect(screen.getByText("Nano Banana")).toBeInTheDocument();
+      expect(screen.getByText(/Nano Banana Pro \(Kie\.ai\)/)).toBeInTheDocument();
+      expect(screen.getByText(/Nano Banana \(Gemini\)/)).toBeInTheDocument();
     });
 
     it("should render aspect ratio select", () => {
